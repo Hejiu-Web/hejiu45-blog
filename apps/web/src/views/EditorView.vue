@@ -189,6 +189,8 @@ function payload(overrides = {}) {
     typeId: form.value.typeId,
     fields: form.value.fields,
     media: form.value.media.filter((m) => m.url && m.kind !== 'skipped'),
+    // 合集归属必须随请求带上，否则后端无从知道要加入哪些合集
+    collections: form.value.collections,
     ...overrides,
   };
 }

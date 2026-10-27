@@ -313,6 +313,65 @@ export function setCollectionItems(collectionId, postIds) {
   return collectionPosts(String(collection.id));
 }
 
+/**
+ * 设置某篇文章所属的合集（写作台保存时调用）。
+ *
+ * 关键：只能动「这篇���章」的归属关系，绝不能像 setCollectionItems 那样
+ * 删除整个合集的成员——那会把合集里别的文章一起清空。
+ *
+ * @param {string} postId 文章 id
+ * @param {string[]} slugs 要归属的合集 slug 列表（空数组表示不加入任何合集）
+ */
+export function setPostCollections(postId, slugs) {
+  const id = String(postId);
+  if (!get('SELECT id FROM posts WHERE id = ?', [id])) throw notFound('文章不存在');
+
+  // 只接受真实存在的合集，防止写入脏数据
+  const wanted = [...new Set((Array.isArray(slugs) ? slugs : []).map((s) => String(s).trim()).filter(Boolean))];
+  const valid = [];
+  for (const slug of wanted) {
+    const row = get('SELECT id FROM collections WHERE slug = ? OR id = ?', [slug, Number(slug) || -1]);
+    if (row) valid.push(String(row.id));
+  }
+
+  const current = all('SELECT collection_id FROM collection_items WHERE post_id = ?', [id]).map((r) =>
+    String(r.collection_id),
+  );
+  const currentSet = new Set(current);
+  const wantedSet = new Set(valid);
+
+  const toRemove = current.filter((cid) => !wantedSet.has(cid));
+  const toAdd = valid.filter((cid) => !currentSet.has(cid));
+
+  if (!toRemove.length && !toAdd.length) return { added: 0, removed: 0 };
+
+  const now = Date.now();
+  tx(() => {
+    for (const cid of toRemove) {
+      run('DELETE FROM collection_items WHERE collection_id = ? AND post_id = ?', [cid, id]);
+    }
+    for (const cid of toAdd) {
+      const { next } = get(
+        'SELECT COALESCE(MAX(position), -1) + 1 AS next FROM collection_items WHERE collection_id = ?',
+        [cid],
+      );
+      try {
+        run('INSERT INTO collection_items (collection_id, post_id, position, added_at) VALUES (?, ?, ?, ?)', [
+          cid,
+          id,
+          next,
+          now,
+        ]);
+      } catch (err) {
+        // 并发写入撞唯一约束：说明已经加进去了，忽略即可
+        if (!String(err.message).includes('UNIQUE')) throw err;
+      }
+    }
+  });
+
+  return { added: toAdd.length, removed: toRemove.length };
+}
+
 /** 把文章加入/移出合集（点击式操作） */
 export function toggleCollectionItem(collectionId, postId) {
   const collection = get('SELECT id FROM collections WHERE id = ?', [Number(collectionId)]);

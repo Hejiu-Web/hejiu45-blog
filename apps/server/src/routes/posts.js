@@ -18,6 +18,7 @@ import {
   getType,
   listTypes,
   normalizeFieldValues,
+  setPostCollections,
 } from '../lib/content-model.js';
 import { hashVisitor, randomId } from '../lib/crypto.js';
 import { writeCover } from '../lib/cover.js';
@@ -310,6 +311,10 @@ router.post('/posts', limiters.write, requireAuthor, (req, res) => {
     ],
   );
   if (data.featured) run('UPDATE posts SET featured = 0 WHERE id != ?', [id]);
+  // 合集归属：只有前端明确传了 collections 才处理，避免「没传」被当成「清空」
+  if (Array.isArray(req.body?.collections)) {
+    setPostCollections(id, req.body.collections);
+  }
   refreshIndex(id);
   audit('post.create', { userId: req.user.id, req, detail: `${slug} ${data.status}` });
   const saved = get('SELECT * FROM posts WHERE id = ?', [id]);
@@ -353,6 +358,10 @@ router.put('/posts/:id', limiters.write, requireAuthor, (req, res) => {
     ],
   );
   if (data.featured) run('UPDATE posts SET featured = 0 WHERE id != ?', [current.id]);
+  // 合集归属：只有前端明确传了 collections 才处理
+  if (Array.isArray(req.body?.collections)) {
+    setPostCollections(current.id, req.body.collections);
+  }
   refreshIndex(current.id);
   audit('post.update', { userId: req.user.id, req, detail: `${slug} ${data.status}` });
   const saved = get('SELECT * FROM posts WHERE id = ?', [current.id]);
