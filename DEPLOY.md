@@ -208,7 +208,7 @@ pnpm audit:security
 |---|---|
 | 启动即退出，日志提到 `AUTH_SECRET` | 没配或不足 32 位，按上文生成后填进 `.env` |
 | 页面能开但登录后立刻掉登录 | `COOKIE_SECURE=true` 但实际走的是 http，或反代没传 `X-Forwarded-Proto` |
-| 上传图片 413 | Nginx `client_max_body_size` 小于 `UPLOAD_MAX_BYTES`，调大或调小后者 |
+| 上传图片 413 | Nginx `client_max_body_size` 小于 `UPLOAD_MAX_BYTES` | 改 `.env` 的 `UPLOAD_MAX_BYTES`（默认 `500MB`），重启后按日志提示同步 Nginx |
 | 微信扫码后提示 redirect_uri 错误 | 回调域名填错，或 `SITE_URL` 与实际访问域名不一致 |
 | 上传文件 404 | `uploads` 目录没挂载卷，重建容器后丢了；或容器内权限不足 |
 | 静态资源 404 | 忘记 `pnpm build`，`apps/web/dist` 不存在；生产模式不会回退到源码 |

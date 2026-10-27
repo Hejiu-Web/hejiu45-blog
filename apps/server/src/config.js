@@ -30,6 +30,37 @@ const bool = (value, fallback = false) => {
   return ['1', 'true', 'yes', 'on'].includes(String(value).toLowerCase());
 };
 
+/**
+ * 解析上传体积上限，支持两种写法：
+ *   纯数字  → 按字节理解（兼容旧配置，如 4194304）
+ *   带单位  → 500MB / 500M / 2GB / 100KB
+ * 解析失败时回退到默认值，避免一个笔误把上限变成 0 或 NaN。
+ */
+function parseUploadLimit(raw, fallback) {
+  if (raw === undefined || raw === '') return fallback;
+  const text = String(raw).trim().toUpperCase();
+  const match = text.match(/^(\d+(?:\.\d+)?)\s*(B|KB|MB|GB)?$/);
+  if (!match) return fallback;
+
+  const value = Number(match[1]);
+  if (!Number.isFinite(value) || value <= 0) return fallback;
+
+  const unit = match[2] || 'B';
+  const factor = { B: 1, KB: 1024, MB: 1024 ** 2, GB: 1024 ** 3 }[unit];
+  const bytes = Math.floor(value * factor);
+  // 防御：至少 1KB，避免配置成 1B 之类让上传彻底不可用
+  return Math.max(1024, bytes);
+}
+
+/** 把字节数换算成便于阅读的形式，启动日志与提示文案共用 */
+export function formatBytes(bytes) {
+  const n = Number(bytes) || 0;
+  if (n >= 1024 ** 3) return `${Math.round((n / 1024 ** 3) * 10) / 10}GB`;
+  if (n >= 1024 ** 2) return `${Math.round((n / 1024 ** 2) * 10) / 10}MB`;
+  if (n >= 1024) return `${Math.round(n / 1024)}KB`;
+  return `${n}B`;
+}
+
 /** 密钥：优先用环境变量；开发环境回退到固定值；生产环境禁止使用默认值 */
 function resolveSecret() {
   const raw = process.env.AUTH_SECRET;
@@ -85,7 +116,13 @@ export const config = {
   /** 内容安全 */
   security: {
     uploadsEnabled: bool(process.env.UPLOADS_ENABLED, true),
-    uploadMaxBytes: Number(process.env.UPLOAD_MAX_BYTES || 4 * 1024 * 1024),
+    /**
+     * 上传体积上限（字节）。这是**唯一**需要修改的地方：
+     * - 媒体上传、封面/头像上传都读这个值
+     * - 启动时会换算成 Nginx 需要的单位打印出来，照着改 client_max_body_size 即可
+     * 默认 500MB，够传一部完整的视频。
+     */
+    uploadMaxBytes: parseUploadLimit(process.env.UPLOAD_MAX_BYTES, 500 * 1024 * 1024),
     ipDeny: (process.env.IP_DENYLIST || '')
       .split(',')
       .map((s) => s.trim())
@@ -132,8 +169,12 @@ export function auditConfig() {
   if (config.trustProxy > 0 && !config.isProd) {
     warnings.push('开发环境信任代理：直接访问时可通过伪造 X-Forwarded-For 绕过按 IP 限流（生产环境有真实反代时属正常配置）');
   }
-  if (config.security.uploadMaxBytes > 8 * 1024 * 1024) {
-    warnings.push('UPLOAD_MAX_BYTES 过大，可能被用于耗尽磁盘');
+  // 500MB 是给视频留的余量；再往上风险主要落在磁盘与带宽，这里只提示不阻止
+  if (config.security.uploadMaxBytes > 1024 * 1024 * 1024) {
+    warnings.push(
+      `UPLOAD_MAX_BYTES 为 ${formatBytes(config.security.uploadMaxBytes)}，超过 1GB；` +
+        '请确认磁盘余量与带宽，必要时改用对象存储',
+    );
   }
 
   const wx = wechatStatus();

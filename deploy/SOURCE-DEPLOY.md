@@ -121,7 +121,7 @@ AUTH_SECRET=<64位随机串>
 ADMIN_PASSWORD=<你的强密码>
 COOKIE_SECURE=true
 TRUST_PROXY=1        ← 有 Nginx 反代就是 1
-UPLOAD_MAX_BYTES=8388608
+UPLOAD_MAX_BYTES=500MB
 ```
 
 生成密钥：
@@ -227,7 +227,7 @@ sudo systemctl start hl-blog
 | `invalid ELF header` 或 `cannot open shared object file` | 上传了 Windows 的 `node_modules` | `rm -rf node_modules && pnpm install` |
 | 启动即退出，日志提 `AUTH_SECRET` | 密钥没配或不足 32 位 | 按上文生成后填 `.env` |
 | 登录后立刻掉登录 | `COOKIE_SECURE=true` 但走的是 http，或 Nginx 未传 `X-Forwarded-Proto` | 确认 HTTPS，检查 nginx 配置 |
-| 上传图片 413 | Nginx `client_max_body_size` 太小 | 调大，且要 ≥ `UPLOAD_MAX_BYTES` |
+| 上传图片 413 | Nginx `client_max_body_size` 太小 | 调大，且要 ≥ `UPLOAD_MAX_BYTES`（默认 500MB） |
 | 页面 404 或白屏 | 忘记 `pnpm build`，`apps/web/dist` 不存在 | 执行构建 |
 | 中文文件名乱码 | Windows zip 与 Linux unzip 编码不一致 | 改用 tar.gz 或 `scp -r` |
 | 权限错误 `EACCES` | 数据目录属主不对 | `chown -R www-data:www-data apps/server/{data,uploads}` |

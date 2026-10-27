@@ -144,6 +144,35 @@ TRUST_PROXY=1                      # 有 Nginx 反代时必须为 1
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
+### 上传大小：只改一处
+
+单个文件上限由 `.env` 里**唯一一个**变量控制，默认 **500MB**：
+
+```ini
+UPLOAD_MAX_BYTES=500MB
+```
+
+支持带单位（`500MB`、`2GB`、`100mb`）或纯字节（`524288000`）。媒体库、封面、头像上传全部读它，不用分别配置。
+
+改完重启，应用会在启动日志里**直接打印** Nginx 该写什么：
+
+```
+  上传上限    →  500MB（单个文件）
+  Nginx 需同步 → client_max_body_size 500m;
+```
+
+把这一行抄进 Nginx 的 `server` 块即可。上传大文件还需要放宽超时（`deploy/nginx.conf` 里已经配好）：
+
+```nginx
+client_max_body_size 500m;
+
+location /api/ {
+    proxy_request_buffering off;   # 上传不缓冲，直接流式转发
+    proxy_read_timeout 600s;
+    proxy_send_timeout 600s;
+}
+```
+
 ---
 
 ## 部署避坑清单
@@ -185,7 +214,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 |---|---|---|
 | 502 Bad Gateway | Nginx 连不上应用 | 先 `curl -I http://127.0.0.1:8787/api/health`，再查 SELinux：`setsebool -P httpd_can_network_connect 1` |
 | 登录后立刻掉登录 | `COOKIE_SECURE=true` 但走 http，或反代没传 `X-Forwarded-Proto` | 确认 HTTPS，并在 `location` 里加 `proxy_set_header X-Forwarded-Proto https;` |
-| 上传图片 413 | `client_max_body_size` 太小 | 调到 ≥ `UPLOAD_MAX_BYTES`（如 `8m`） |
+| 上传图片 413 | Nginx `client_max_body_size` 太小 | 调到 ≥ `UPLOAD_MAX_BYTES`（默认 500MB，写 `500m`）。改 `.env` 后重启，启动日志会打印该填的值 |
 | 所有访客被当成同一 IP | `TRUST_PROXY` 没设 | 有反代时必须 `TRUST_PROXY=1`，否则登录限流会误伤所有人 |
 | 页面 404 / 白屏 | 忘记 `pnpm build`，`apps/web/dist` 不存在 | 执行构建 |
 

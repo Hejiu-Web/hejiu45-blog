@@ -2,7 +2,7 @@ import express from 'express';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { config, auditConfig } from './config.js';
+import { config, auditConfig, formatBytes } from './config.js';
 import { openDb, resolveDriver } from './db.js';
 import { ensureAdmin, seedDefaults, seedIfEmpty } from './seed.js';
 import { loadExtensions } from './extensions.js';
@@ -187,7 +187,16 @@ if (isMain) {
   const server = app.listen(config.port, () => {
     console.log(`\n  鹤酒 Blog  →  http://localhost:${config.port}`);
     console.log(`  运行模式    →  ${config.isProd ? 'production' : 'development'}`);
-    console.log(`  安全响应头  →  CSP / HSTS / X-Frame-Options 已启用\n`);
+    console.log(`  安全响应头  →  CSP / HSTS / X-Frame-Options 已启用`);
+    // 上传上限是「一处修改」的配置项，这里直接把 Nginx 该怎么写打印出来
+    const maxBytes = config.security.uploadMaxBytes;
+    const maxMB = Math.max(1, Math.ceil(maxBytes / 1024 / 1024));
+    console.log(`  上传上限    →  ${formatBytes(maxBytes)}（单个文件）`);
+    if (config.trustProxy > 0) {
+      console.log(`  Nginx 需同步 → client_max_body_size ${maxMB}m;`);
+      console.log(`              （放在 server 块内，值要 ≥ 上传上限）`);
+    }
+    console.log('');
   });
 
   // 优雅退出：把已建立的连接处理完再退出，避免写库时被强杀

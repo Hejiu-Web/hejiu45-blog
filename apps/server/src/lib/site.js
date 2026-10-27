@@ -139,6 +139,8 @@ export function publicSiteInfo() {
     rssTitle: settings.rssTitle || settings.siteName,
     footerText: settings.footerText || `© ${new Date().getFullYear()} ${settings.siteName} · 保留所有权利`,
     siteUrl: config.siteUrl,
+    // 前端展示「单个文件上限」用，避免用户还要去翻 .env
+    uploadMaxBytes: config.security.uploadMaxBytes,
   };
 }
 

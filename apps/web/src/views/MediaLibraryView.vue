@@ -6,6 +6,18 @@ import EmptyState from '@/components/EmptyState.vue';
 import { api } from '@/api/client';
 import { toast } from '@/composables/useToast';
 import { formatDate } from '@/utils/format';
+import { useSiteStore } from '@/stores/site';
+
+const site = useSiteStore();
+
+/** 单个文件上限：直接显示后端换算好的数值，用户不用去翻 .env */
+const uploadLimitLabel = computed(() => {
+  const bytes = Number(site.info.uploadMaxBytes);
+  if (!Number.isFinite(bytes) || bytes <= 0) return '受限';
+  if (bytes >= 1024 ** 3) return `${Math.round((bytes / 1024 ** 3) * 10) / 10} GB`;
+  if (bytes >= 1024 ** 2) return `${Math.round((bytes / 1024 ** 2) * 10) / 10} MB`;
+  return `${Math.round(bytes / 1024)} KB`;
+});
 
 const kind = ref('');
 const items = ref([]);
@@ -129,7 +141,7 @@ onMounted(() => load());
     >
       <BaseIcon name="upload" :size="18" />
       把图片或视频拖到这里上传
-      <span class="drop-hint">单个文件上限见 .env 的 UPLOAD_MAX_BYTES</span>
+      <span class="drop-hint">单个文件上限 {{ uploadLimitLabel }}</span>
     </div>
 
     <div class="tabs" role="tablist">

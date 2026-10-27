@@ -276,7 +276,7 @@ server {
     ssl_certificate     /etc/nginx/ssl/xxx.pem;
     ssl_certificate_key /etc/nginx/ssl/xxx.key;
 
-    client_max_body_size 8m;          # 必须 ≥ UPLOAD_MAX_BYTES
+    client_max_body_size 500m;        # 必须 ≥ UPLOAD_MAX_BYTES（默认 500MB）
 
     location / {
         proxy_pass http://127.0.0.1:8787;
@@ -294,7 +294,7 @@ server {
 
 **三个关键点**：
 
-1. `client_max_body_size 8m` —— 不设的话图片超过 1MB 就 413
+1. `client_max_body_size 500m` —— 不设的话默认只有 1MB，图片稍大就 413
 2. `X-Forwarded-Proto https` —— 不设的话 `COOKIE_SECURE` 失效，登录后立刻掉
 3. `.env` 里 `TRUST_PROXY=1` —— 不设的话所有访客被识别成同一 IP，一人触发限流全员被锁
 

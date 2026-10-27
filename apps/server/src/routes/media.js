@@ -28,9 +28,16 @@ router.post('/media', limiters.upload, requireAuthor, async (req, res) => {
   res.status(201).json({ media });
 });
 
-/** 头像：只接受图片，生成正方形 WebP */
+/**
+ * 头像：只接受图片，生成正方形 WebP。
+ * 头像上限固定 5MB —— 一张头像没必要比这更大，
+ * 但也不能超过全局 UPLOAD_MAX_BYTES（用户可能把它调得很小）。
+ */
+const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
+
 router.post('/avatar', limiters.upload, requireAuth, async (req, res) => {
-  const buffer = await readUpload(req, Math.min(config.security.uploadMaxBytes, 5 * 1024 * 1024));
+  const limit = Math.min(config.security.uploadMaxBytes, AVATAR_MAX_BYTES);
+  const buffer = await readUpload(req, limit);
   if (detectKind(buffer) !== 'image') throw new HttpError(400, '头像必须是图片', 'INVALID_IMAGE');
   const media = await saveImage(buffer, { userId: req.auth.user.id });
   audit('avatar.upload', { userId: req.auth.user.id, req });
