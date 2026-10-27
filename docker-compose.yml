@@ -1,0 +1,43 @@
+# 生产部署示例：docker compose up -d
+#
+# 使用前：
+#   1. 复制 .env.example 为 .env，至少填好 SITE_URL、AUTH_SECRET、ADMIN_PASSWORD
+#   2. 把下面 environment 里的变量与 .env 对应起来（或直接用 env_file）
+#
+# 数据持久化在命名卷里，重建容器不会丢文章与上传文件。
+
+services:
+  app:
+    build: .
+    image: hl-blog:latest
+    container_name: hl-blog
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 8787
+      # compose 内部直接连 app 容器，不需要信任代理层
+      TRUST_PROXY: 0
+      # 数据目录指向挂载卷
+      DATA_DIR: /app/apps/server/data
+    ports:
+      # 只绑本机，由宿主机的 Nginx 终结 TLS 后转发
+      - '127.0.0.1:8787:8787'
+    volumes:
+      - blog-data:/app/apps/server/data
+      - blog-uploads:/app/apps/server/uploads
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:8787/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  blog-data:
+  blog-uploads:

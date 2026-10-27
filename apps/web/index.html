@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>鹤酒 · 写代码，也写生活里的留白</title>
+    <meta name="description" content="鹤酒的个人空间：前端工程、视觉设计与长期主义。" />
+    <meta name="theme-color" content="#fbfbfa" />
+    <link rel="alternate" type="application/rss+xml" title="鹤酒 RSS" href="/rss.xml" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <script>
+      // 首帧前确定主题，避免深色模式闪白。
+      // 三档：light / dark / system；没有记录时跟随系统。
+      (() => {
+        try {
+          const saved = localStorage.getItem('hl:theme');
+          const mode = saved === 'light' || saved === 'dark' || saved === 'system' ? saved : 'system';
+          const dark = mode === 'system' ? matchMedia('(prefers-color-scheme: dark)').matches : mode === 'dark';
+          document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+          document.documentElement.dataset.themeMode = mode;
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', dark ? '#141414' : '#fbfbfa');
+        } catch {
+          document.documentElement.dataset.theme = 'light';
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,6 @@
+{
+  "name": "@hl/server",
+  "private": true,
+  "type": "module",
+  "main": "src/index.js"
+}

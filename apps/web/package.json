@@ -1,0 +1,5 @@
+{
+  "name": "@hl/web",
+  "private": true,
+  "type": "module"
+}

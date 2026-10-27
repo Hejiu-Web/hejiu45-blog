@@ -1,0 +1,46 @@
+# 和久博客 · systemd 服务示例（不用 Docker 时使用）
+#
+# 用法：
+#   sudo cp deploy/hl-blog.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now hl-blog
+#   sudo journalctl -u hl-blog -f      # 看日志
+#
+# 前提：代码放在 /srv/hl-blog，已执行过 pnpm install && pnpm build
+
+[Unit]
+Description=Hejiu Blog (Node.js)
+Documentation=https://github.com/hejiu45/hl-blog
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/srv/hl-blog
+
+# 生产环境：缺 AUTH_SECRET 会直接拒绝启动
+Environment=NODE_ENV=production
+Environment=PORT=8787
+Environment=TRUST_PROXY=1
+EnvironmentFile=/srv/hl-blog/.env
+
+ExecStart=/usr/bin/node apps/server/src/index.js
+
+Restart=always
+RestartSec=3
+
+# ── 加固 ──
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/hl-blog/apps/server/data /srv/hl-blog/apps/server/uploads
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=hl-blog
+
+[Install]
+WantedBy=multi-user.target

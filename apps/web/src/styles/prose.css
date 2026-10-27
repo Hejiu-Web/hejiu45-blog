@@ -1,0 +1,353 @@
+/* ------------------------------------------------------------------
+   正文排版：长文阅读的唯一样式来源
+   中文优化：中英混排间距、段距用 em、代码块横向滚动
+------------------------------------------------------------------- */
+
+.prose {
+  font-size: 1.0625rem;
+  line-height: 1.85;
+  color: var(--ink-mid);
+  letter-spacing: 0.006em;
+  overflow-wrap: anywhere;
+}
+
+.prose > * + * {
+  margin-top: 1.35em;
+}
+
+.prose h2,
+.prose h3,
+.prose h4 {
+  color: var(--ink);
+  line-height: 1.35;
+  scroll-margin-top: calc(var(--header-h) + 32px);
+  letter-spacing: -0.015em;
+}
+
+.prose h2 {
+  font-size: 1.55rem;
+  font-weight: 650;
+  margin-top: 2.6em;
+  margin-bottom: 0.9em;
+  padding-top: 1.1em;
+  border-top: 1px solid var(--rule);
+}
+
+.prose h2::before {
+  content: '§';
+  margin-right: 0.55em;
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  color: var(--accent);
+  opacity: 0.75;
+}
+
+.prose h3 {
+  font-size: 1.2rem;
+  font-weight: 620;
+  margin-top: 2em;
+  margin-bottom: 0.7em;
+}
+
+.prose h4 {
+  font-size: 1.05rem;
+  font-weight: 620;
+  margin-top: 1.6em;
+}
+
+.prose p {
+  margin-block: 1.15em;
+}
+
+.prose a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--rule-strong);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.28em;
+  transition: text-decoration-color 0.25s ease, color 0.25s ease;
+}
+
+.prose a:hover {
+  color: var(--accent);
+  text-decoration-color: var(--accent);
+}
+
+.prose strong {
+  color: var(--ink);
+  font-weight: 650;
+}
+
+.prose em {
+  font-style: italic;
+}
+
+.prose ul,
+.prose ol {
+  padding-left: 1.4em;
+}
+
+.prose ul {
+  list-style: none;
+}
+
+.prose ul > li {
+  position: relative;
+}
+
+.prose ul > li::before {
+  content: '';
+  position: absolute;
+  left: -1.05em;
+  top: 0.85em;
+  width: 5px;
+  height: 1px;
+  background: var(--ink-soft);
+}
+
+.prose ol {
+  list-style: decimal;
+}
+
+.prose ol::marker,
+.prose ol > li::marker {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  color: var(--accent);
+}
+
+.prose li + li {
+  margin-top: 0.45em;
+}
+
+.prose li > ul,
+.prose li > ol {
+  margin-top: 0.45em;
+}
+
+.prose blockquote {
+  margin-inline: 0;
+  padding: 0.15em 0 0.15em 1.4em;
+  border-left: 2px solid var(--accent);
+  color: var(--ink);
+  font-size: 1.08em;
+  line-height: 1.75;
+}
+
+.prose blockquote p {
+  margin-block: 0.4em;
+}
+
+.prose hr {
+  border: 0;
+  height: 1px;
+  background: var(--rule);
+  margin-block: 3em;
+}
+
+.prose img {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--rule);
+  width: 100%;
+  height: auto;
+  background: var(--paper-soft);
+}
+
+.prose figure {
+  margin-block: 2em;
+}
+
+.prose figcaption {
+  margin-top: 0.7em;
+  font-size: 0.8125rem;
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+}
+
+.prose code:not(pre code) {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  padding: 0.15em 0.4em;
+  border-radius: var(--radius-xs);
+  background: var(--paper-soft);
+  border: 1px solid var(--rule);
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+  margin-block: 1.8em;
+  display: block;
+  overflow-x: auto;
+}
+
+.prose thead th {
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  font-weight: 500;
+  padding: 0 1em 0.7em 0;
+  border-bottom: 1px solid var(--rule-strong);
+  white-space: nowrap;
+}
+
+.prose tbody td {
+  padding: 0.7em 1em 0.7em 0;
+  border-bottom: 1px solid var(--rule);
+  color: var(--ink-mid);
+  vertical-align: top;
+}
+
+.prose tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.prose kbd {
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  padding: 0.1em 0.35em;
+  border: 1px solid var(--rule-strong);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-xs);
+}
+
+/* 代码块：深色窗体在浅色模式下也成立，属于「纸张上的终端窗口」 */
+.code-block {
+  position: relative;
+  background: oklch(20% 0.01 260);
+  border: 1px solid oklch(30% 0.012 260);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin-block: 1.9em;
+}
+
+.code-block::before {
+  content: attr(data-lang);
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 0.45rem 0.85rem;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: oklch(72% 0.02 260);
+  border-right: 1px solid oklch(30% 0.012 260);
+  border-bottom: 1px solid oklch(30% 0.012 260);
+  border-bottom-right-radius: var(--radius-sm);
+  user-select: none;
+}
+
+.code-block pre {
+  margin: 0;
+  padding: 2.4rem 1.15rem 1.15rem;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 0.8375rem;
+  line-height: 1.7;
+  color: oklch(88% 0.01 260);
+  tab-size: 2;
+}
+
+.code-block pre code {
+  font-family: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
+.code-copy {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  padding: 0.3rem 0.6rem;
+  border-radius: var(--radius-xs);
+  color: oklch(78% 0.015 260);
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.code-copy:hover {
+  color: oklch(98% 0 0);
+  border-color: oklch(40% 0.012 260);
+  background: oklch(26% 0.012 260);
+}
+
+.code-copy[data-copied='true'] {
+  color: oklch(80% 0.15 150);
+}
+
+/* highlight.js 主题：只保留语法层级，不引入第三方 CSS 文件 */
+.hljs-comment,
+.hljs-quote {
+  color: oklch(58% 0.02 260);
+  font-style: italic;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-section,
+.hljs-doctag,
+.hljs-type,
+.hljs-name,
+.hljs-strong {
+  color: oklch(76% 0.14 330);
+}
+
+.hljs-string,
+.hljs-regexp,
+.hljs-addition,
+.hljs-attribute,
+.hljs-meta .hljs-string {
+  color: oklch(80% 0.13 140);
+}
+
+.hljs-number,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-link,
+.hljs-selector-attr,
+.hljs-selector-pseudo {
+  color: oklch(82% 0.12 70);
+}
+
+.hljs-title,
+.hljs-title.function_,
+.hljs-selector-id,
+.hljs-selector-class {
+  color: oklch(80% 0.1 230);
+}
+
+.hljs-variable,
+.hljs-template-variable,
+.hljs-attr,
+.hljs-property,
+.hljs-params {
+  color: oklch(88% 0.02 260);
+}
+
+.hljs-built_in,
+.hljs-class .hljs-title,
+.hljs-meta {
+  color: oklch(78% 0.11 200);
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-deletion {
+  color: oklch(72% 0.16 25);
+}

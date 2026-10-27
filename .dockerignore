@@ -1,0 +1,11 @@
+# 构建产物、依赖、数据不入镜像上下文
+node_modules
+**/node_modules
+apps/web/dist
+apps/server/data
+apps/server/uploads
+.env
+*.log
+.local
+.git
+.github
