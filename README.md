@@ -196,6 +196,8 @@ location /api/ {
 | 服务器上 `invalid ELF header` | 上传了 Windows 的 `node_modules` | **绝不要上传 `node_modules`**，里面是 win32 二进制，必须在服务器重新安装 |
 | 解压后目录多套了一层 | 压缩包内已含根目录 | `tar -xzf` 后检查，必要时 `mv hl-blog/* .` |
 | 解压后中文文件名乱码 | Windows zip 编码 | 用本项目的 `pnpm release`（生成 tar.gz，无此问题） |
+| **部署后文章/图片被覆盖** | `tar --exclude` 对绝对路径无效（`DATA_DIR` 为绝对路径时排除失效） | 升级 `deploy/remote-deploy.sh`。新版改为「快照内删除后复制」，不再依赖 tar 排除 |
+| **脚本报「未预期的符号 `'('`」** | 用了 bash 5.x 能跑、CentOS 8 的 bash 4.4 不认的写法 | 升级脚本；务必在服务器上 `bash -n` 验证，别只在 Windows 的 Git Bash 里试 |
 
 ### systemd
 
