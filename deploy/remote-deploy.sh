@@ -150,55 +150,35 @@ to_rel() {
 DATA_TAR_REL="$(to_rel "$DATA_REL")"
 UPLOAD_TAR_REL="$(to_rel "$UPLOAD_REL")"
 
-EXCLUDES=()
-if [ -n "$DATA_TAR_REL" ]; then
-  EXCLUDES+=(--exclude="$DATA_TAR_REL" --exclude="./$DATA_TAR_REL")
-fi
-if [ -n "$UPLOAD_TAR_REL" ] && [ "$UPLOAD_TAR_REL" != "$DATA_TAR_REL" ]; then
-  EXCLUDES+=(--exclude="$UPLOAD_TAR_REL" --exclude="./$UPLOAD_TAR_REL")
-fi
+# 是否需要跳过运行时目录：只要有一个落在项目内就需要处理
+# 用 if 而不是 &&，避免 set -e 下条件为假时被当成失败退出
+NEED_SKIP=0
+if [ -n "$DATA_TAR_REL" ]; then NEED_SKIP=1; fi
+if [ -n "$UPLOAD_TAR_REL" ]; then NEED_SKIP=1; fi
+# 项目根下若存在 data/ 或 uploads/，无论配置如何都要保护
+if [ -d data ]; then NEED_SKIP=1; fi
+if [ -d uploads ]; then NEED_SKIP=1; fi
 
-# 兜底：连同项目根下常见的运行时目录一起排除。
-# 用户可能把 DATA_DIR 指向 data，却忘了配 UPLOAD_DIR，
-# 此时不许让发布包里的 uploads/ 覆盖真实上传文件。
-for guess in data uploads; do
-  EXCLUDES+=(--exclude="$guess" --exclude="./$guess")
-done
-
-if [ ${#EXCLUDES[@]} -gt 0 ]; then
+if [ "$NEED_SKIP" = "1" ]; then
   echo "    跳过：${DATA_TAR_REL:-$DATA_REL}${UPLOAD_TAR_REL:+ / $UPLOAD_TAR_REL}"
+
+  # 做法：先删掉快照里的数据目录，再整体复制。
+  # 不在 tar 层面依赖 --exclude 的路径匹配细节，逻辑更直白，
+  # 对 bash 4.4 / tar 1.30（CentOS 8）都稳定。
   SNAP="$(mktemp -d)"
-  tar -cf "$SNAP/src.tar" -C .release-tmp "${EXCLUDES[@]}" .
-  # 二次保险：确认包内已无数据路径；若有则改用逐文件复制
-  GUARD_PAT="^\\./(data|uploads)($|/)"
-  [ -n "$DATA_TAR_REL" ] && GUARD_PAT="$GUARD_PAT|^\\./$DATA_TAR_REL($|/)"
-  [ -n "$UPLOAD_TAR_REL" ] && GUARD_PAT="$GUARD_PAT|^\\./$UPLOAD_TAR_REL($|/)"
-  if tar -tf "$SNAP/src.tar" | grep -qE "$GUARD_PAT"; then
-    echo "    警告：排除未完全生效，改用逐文件复制" >&2
-    rm -f "$SNAP/src.tar"
-    ( cd .release-tmp && find . \( -type f -o -type l \) -print ) | while IFS= read -r f; do
-      rel="${f#./}"
-      skip=0
-      case "$rel" in
-        data|data/*|uploads|uploads/*) skip=1 ;;
-      esac
-      if [ -n "$DATA_TAR_REL" ]; then
-        case "$rel" in
-          "$DATA_TAR_REL"|"$DATA_TAR_REL"/*) skip=1 ;;
-        esac
-      fi
-      if [ -n "$UPLOAD_TAR_REL" ]; then
-        case "$rel" in
-          "$UPLOAD_TAR_REL"|"$UPLOAD_TAR_REL"/*) skip=1 ;;
-        esac
-      fi
-      [ "$skip" = "1" ] && continue
-      mkdir -p "$(dirname "$rel")"
-      cp -a ".release-tmp/$rel" "$rel"
-    done
-  else
-    tar -xf "$SNAP/src.tar" -C .
-  fi
+  cp -a .release-tmp/. "$SNAP/"
+
+  # 逐个删掉快照里的运行时目录（按相对路径，避免误删项目外的真实数据）
+  for rel in "$DATA_TAR_REL" "$UPLOAD_TAR_REL" data uploads; do
+    [ -n "$rel" ] || continue
+    if [ -e "$SNAP/$rel" ]; then
+      rm -rf "$SNAP/$rel"
+      echo "    快照已剔除：$rel"
+    fi
+  done
+
+  # 从清理过的快照复制回项目目录
+  cp -a "$SNAP/." .
   rm -rf "$SNAP"
 else
   cp -a .release-tmp/. .
