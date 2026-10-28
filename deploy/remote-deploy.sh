@@ -86,6 +86,20 @@ if [ "$DATA_REL" = "$UPLOAD_REL" ]; then
   echo "    警告：DATA_DIR 与 UPLOAD_DIR 相同，将按目录整体备份" >&2
 fi
 
+# 备份前先停服务：SQLite 开着 WAL 时直接 cp 会拿到不一致的快照。
+# 停一下再复制，能保证备份是完整可用的（真要回滚时靠得住）。
+SERVICE_WAS_ACTIVE=0
+if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet hl-blog 2>/dev/null; then
+  SERVICE_WAS_ACTIVE=1
+  echo "    暂停服务以保证备份一致"
+  systemctl stop hl-blog 2>/dev/null || true
+  sleep 1
+
+  # 兜底：无论后面哪一步失败（装依赖、构建报错等），都要把服务拉起来，
+  # 否则站点会一直处于停止状态。
+  trap 'if systemctl is-active --quiet hl-blog 2>/dev/null; then :; else echo "    [中断] 正在恢复服务..." >&2; systemctl start hl-blog 2>/dev/null || true; fi' EXIT
+fi
+
 KEEP="$(mktemp -d)"
 BACKED_UP=0
 if [ -n "$DATA_REL" ] && [ -d "$DATA_REL" ]; then
@@ -110,27 +124,117 @@ if [ "$BACKED_UP" = "0" ]; then
   exit 1
 fi
 
-echo "[3/6] 覆盖源码（保留 data / uploads / .env）"
-cp -a .release-tmp/. .
+echo "[3/6] 覆盖源码（跳过数据目录）"
+# 核心原则：数据目录原地不动，既不删除也不复制。
+# 旧做法是「先备份 → 覆盖 → rm -rf 数据目录 → 复制回来」，
+# 一旦备份不完整（WAL 未落盘、磁盘满、复制中断）就是永久丢数据。
+# 现在改为在覆盖源码时直接排除数据目录，数据全程不被触碰。
+ROOT_ABS="$(pwd -P)"
+
+# tar 的 --exclude 匹配的是包内相对路径，必须把绝对路径换算成相对路径，
+# 否则 --exclude=/abs/path 永远匹配不上，数据就会被发布包覆盖。
+to_rel() {
+  local abs="$1" rel
+  [ -n "$abs" ] || { printf ''; return; }
+  case "$abs" in
+    "$ROOT_ABS"/*) rel="${abs#"$ROOT_ABS"/}" ;;
+    /*) printf ''; return ;;   # 项目外的路径，不在覆盖范围内
+    *) rel="$abs" ;;
+  esac
+  # 统一去掉 ./ 前缀与结尾斜杠
+  rel="${rel#./}"
+  rel="${rel%/}"
+  printf '%s' "$rel"
+}
+
+DATA_TAR_REL="$(to_rel "$DATA_REL")"
+UPLOAD_TAR_REL="$(to_rel "$UPLOAD_REL")"
+
+EXCLUDES=()
+if [ -n "$DATA_TAR_REL" ]; then
+  EXCLUDES+=(--exclude="$DATA_TAR_REL" --exclude="./$DATA_TAR_REL")
+fi
+if [ -n "$UPLOAD_TAR_REL" ] && [ "$UPLOAD_TAR_REL" != "$DATA_TAR_REL" ]; then
+  EXCLUDES+=(--exclude="$UPLOAD_TAR_REL" --exclude="./$UPLOAD_TAR_REL")
+fi
+
+# 兜底：连同项目根下常见的运行时目录一起排除。
+# 用户可能把 DATA_DIR 指向 data，却忘了配 UPLOAD_DIR，
+# 此时不许让发布包里的 uploads/ 覆盖真实上传文件。
+for guess in data uploads; do
+  EXCLUDES+=(--exclude="$guess" --exclude="./$guess")
+done
+
+if [ ${#EXCLUDES[@]} -gt 0 ]; then
+  echo "    跳过：${DATA_TAR_REL:-$DATA_REL}${UPLOAD_TAR_REL:+ / $UPLOAD_TAR_REL}"
+  SNAP="$(mktemp -d)"
+  tar -cf "$SNAP/src.tar" -C .release-tmp "${EXCLUDES[@]}" .
+  # 二次保险：确认包内已无数据路径；若有则改用逐文件复制
+  GUARD_PAT="^\\./(data|uploads)($|/)"
+  [ -n "$DATA_TAR_REL" ] && GUARD_PAT="$GUARD_PAT|^\\./$DATA_TAR_REL($|/)"
+  [ -n "$UPLOAD_TAR_REL" ] && GUARD_PAT="$GUARD_PAT|^\\./$UPLOAD_TAR_REL($|/)"
+  if tar -tf "$SNAP/src.tar" | grep -qE "$GUARD_PAT"; then
+    echo "    警告：排除未完全生效，改用逐文件复制" >&2
+    rm -f "$SNAP/src.tar"
+    ( cd .release-tmp && find . \( -type f -o -type l \) -print ) | while IFS= read -r f; do
+      rel="${f#./}"
+      skip=0
+      case "$rel" in
+        data|data/*|uploads|uploads/*) skip=1 ;;
+      esac
+      if [ -n "$DATA_TAR_REL" ]; then
+        case "$rel" in
+          "$DATA_TAR_REL"|"$DATA_TAR_REL"/*) skip=1 ;;
+        esac
+      fi
+      if [ -n "$UPLOAD_TAR_REL" ]; then
+        case "$rel" in
+          "$UPLOAD_TAR_REL"|"$UPLOAD_TAR_REL"/*) skip=1 ;;
+        esac
+      fi
+      [ "$skip" = "1" ] && continue
+      mkdir -p "$(dirname "$rel")"
+      cp -a ".release-tmp/$rel" "$rel"
+    done
+  else
+    tar -xf "$SNAP/src.tar" -C .
+  fi
+  rm -rf "$SNAP"
+else
+  cp -a .release-tmp/. .
+fi
+
+# .env 单独保护：发布包不含它，但万一带了也绝不允许覆盖
+if [ -f "$KEEP/.env" ]; then
+  cp -a "$KEEP/.env" . 2>/dev/null || true
+fi
 rm -rf .release-tmp
 
-echo "[4/6] 恢复运行时数据"
-# 恢复前先清掉发布包可能带来的同名目录，避免新旧内容混合
-if [ -d "$KEEP/data" ]; then
-  if [ -n "$DATA_REL" ]; then
-    rm -rf "$DATA_REL"
-    mkdir -p "$DATA_REL"
-    cp -a "$KEEP/data/." "$DATA_REL/"
+echo "[4/6] 校验数据完整性（数据全程未被触碰，仅做检查）"
+if [ -n "$DATA_REL" ] && [ -d "$DATA_REL" ]; then
+  echo "    数据目录完好：$(du -sh "$DATA_REL" 2>/dev/null | cut -f1)（$DATA_REL）"
+  # 主库存在则报告行数，便于确认文章还在
+  DB_FILE=""
+  for candidate in "$DATA_REL/blog.db" "$DATA_REL/app.db"; do
+    [ -f "$candidate" ] && DB_FILE="$candidate" && break
+  done
+  if [ -n "$DB_FILE" ] && command -v node >/dev/null 2>&1; then
+    node -e "
+      try {
+        const { DatabaseSync } = require('node:sqlite');
+        const db = new DatabaseSync(process.argv[1], { readOnly: true });
+        const posts = db.prepare('SELECT COUNT(*) AS c FROM posts').get().c;
+        const users = db.prepare('SELECT COUNT(*) AS c FROM users').get().c;
+        console.log('    文章 ' + posts + ' 篇 · 账号 ' + users + ' 个');
+      } catch (e) { console.log('    （无法读取数据库统计，不影响部署）'); }
+    " "$DB_FILE" 2>/dev/null || true
   fi
+else
+  echo "    警告：数据目录不存在（$DATA_REL）" >&2
 fi
-if [ -d "$KEEP/uploads" ]; then
-  if [ -n "$UPLOAD_REL" ] && [ "$UPLOAD_REL" != "$DATA_REL" ]; then
-    rm -rf "$UPLOAD_REL"
-    mkdir -p "$UPLOAD_REL"
-    cp -a "$KEEP/uploads/." "$UPLOAD_REL/"
-  fi
+if [ -n "$UPLOAD_REL" ] && [ -d "$UPLOAD_REL" ]; then
+  echo "    上传目录完好：$(du -sh "$UPLOAD_REL" 2>/dev/null | cut -f1)（$UPLOAD_REL）"
 fi
-if [ -f "$KEEP/.env" ]; then cp -a "$KEEP/.env" .; fi
 rm -rf "$KEEP"
 
 echo "[5/6] 安装依赖并构建"
