@@ -111,13 +111,28 @@ function loadMore() {
         </EmptyState>
       </div>
 
+      <!--
+        空状态要分两种情况：
+        1) 一篇文章都没有 → 引导去写作台
+        2) 只有一篇文章且已被首屏置顶拿走 → 不该说「还没有文章」，
+           应该说「就这一篇」，并给出查看入口
+      -->
       <EmptyState
-        v-else-if="!list.length"
+        v-else-if="!published.length"
         icon="edit"
         title="还没有公开的文章"
         description="登录写作台，写下第一篇吧。发布之后它会出现在这里。"
       >
         <RouterLink to="/login" class="retry u-press">去登录</RouterLink>
+      </EmptyState>
+
+      <EmptyState
+        v-else-if="!list.length"
+        icon="bookmark"
+        :title="rest.length ? '这些都在上面了' : '就这一篇，先读着'"
+        description="第一篇已经放在页面顶部。写下一篇之后，这里会按时间列出来。"
+      >
+        <RouterLink to="/archive" class="retry u-press">按时间浏览全部</RouterLink>
       </EmptyState>
 
       <template v-else>
